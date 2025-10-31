@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Certificate Verification</title>
+  <style>
+    body { font-family:sans-serif; margin-top:40px; background:#f6f6f6;}
+    .container { background: #fff; padding:25px; box-shadow:0 2px 10px #dadada; border-radius:8px; max-width:400px; margin:auto;}
+    table { margin-top:16px; width:100%; border-collapse:collapse;}
+    h2{color:green;}
+    .fail{color:red;}
+    td {vertical-align: top; padding:4px 8px;}
+    tr:nth-child(odd){background:#f9f9f9;}
+  </style>
+</head>
+<body>
+<div class="container"> 
+<h2>Certificate Verification✔️</h2>
+  <input type="text" id="certId" placeholder="Enter Serial No." />   <button onclick="verify()">Verify</button>  
+<div id="result"></div>
+</div>
+<p>
+<script>
+// The Sheet URL is confirmed to be in the correct CSV format.
+const SHEET_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vR4V9M26cq8UzG76m0WLm8Y49Wpd8uA-yl6TpUGCesZAS-NQZbpy4nt8GmElDuqs0M44b8BVzPAC5YG/pub?gid=0&single=true&output=csv";
+
+let csvData = {};
+
+function fetchSheet(callback) {
+  fetch(SHEET_URL)
+    .then(response => {
+        if (!response.ok) {
+            // This is the place where the "Failed to fetch" error is caught, usually due to CORS/security policy.
+            throw new Error('Sheet Access Error: Network response not ok, or sheet is not publicly published.');
+        }
+        return response.text();
+    })
+    .then(text => {
+      let lines = text.trim().split('\n');
+      if (lines.length < 2) {
+          throw new Error('Sheet Data Error: The sheet is empty or contains only headers.');
+      }
+      let headers = lines[0].replace(/\r/g,'').split(',').map(h => h.trim());
+      let data = {};
+      
+      for (let i = 1; i < lines.length; i++) {
+        let row = lines[i].replace(/\r/g,'').split(',').map(x => x.trim());
+        let obj = {};
+        for (let j = 0; j < headers.length; j++) {
+          obj[headers[j]] = row[j] || ""; 
+        }
+        if(obj["Serial No."]) { 
+           data[obj["Serial No."]] = obj;
+        }
+      }
+      csvData = data;
+      if(callback) callback();
+    })
+    .catch(error => {
+        console.error('Data loading error:', error);
+        document.getElementById('result').innerHTML = "<h2 class='fail'>❌ Data Loading Failed! Please host this file online (e.g., GitHub Pages) or check sheet publishing settings.</h2>";
+    });
+}
+
+function verify() {
+  let id = document.getElementById('certId').value.trim();
+  let resultDiv = document.getElementById('result');
+
+  if (!id) {
+    resultDiv.innerHTML = "<h2 class='fail'>Please enter a Serial No.</h2>";
+    return;
+  }
+  
+  if (Object.keys(csvData).length === 0) {
+    resultDiv.innerHTML = "<h3>⏳ Fetching data... Please wait.</h3>"; 
+    fetchSheet(() => verify()); 
+    return;
+  }
+  
+  let data = csvData[id];
+  if(data && data["Serial No."]){
+    resultDiv.innerHTML =
+      `<h2>✔️😎 Certificate Verified!</h2>
+       <table>
+        <tr><td><b>Institute</b></td><td>${data["Institute"]}</td></tr>
+        <tr><td><b>Course Name</b></td><td>${data["Course Name"]}</td></tr>
+        <tr><td><b>Serial No.</b></td><td>${data["Serial No."]}</td></tr>
+        <tr><td><b>Name</b></td><td>${data["Name"]}</td></tr>
+        <tr><td><b>Designation</b></td><td>${data["Designation"]}</td></tr>
+        <tr><td><b>Date of Validity</b></td><td>${data["Date of Validity"]}</td></tr>
+        <tr><td><b>Status</b></td><td>${data["Status"]}</td></tr>
+       </table>`;
+  }else{
+    resultDiv.innerHTML = "<h2 class='fail'>❌☠️ Certificate NOT found!</h2>";
+  }
+}
+
+window.onload = function() {
+  fetchSheet(()=>{ 
+    let params = new URLSearchParams(window.location.search);
+    let autoCert = params.get("cert");
+    if(autoCert){
+      document.getElementById('certId').value = autoCert;
+      verify();
+    }
+  });
+};
+</script>
+</p>
+</body>
+</html>
